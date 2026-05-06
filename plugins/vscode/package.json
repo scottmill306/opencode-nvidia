@@ -1,0 +1,105 @@
+{
+  "name": "opencode-nvidia",
+  "displayName": "OpenCode NVIDIA",
+  "description": "GPU-accelerated code intelligence powered by NVIDIA models - Real-time, context-aware, secure code assistance",
+  "version": "1.0.0",
+  "publisher": "opencode-nvidia",
+  "engines": {
+    "vscode": "^1.84.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets",
+    "Machine Learning",
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:python",
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onLanguage:cpp",
+    "onLanguage:cuda-cpp"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "opencode.generate",
+        "title": "OpenCode: Generate Code"
+      },
+      {
+        "command": "opencode.complete",
+        "title": "OpenCode: Complete Code"
+      },
+      {
+        "command": "opencode.securityScan",
+        "title": "OpenCode: Security Scan"
+      },
+      {
+        "command": "opencode.refactor",
+        "title": "OpenCode: Refactor for GPU"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "when": "editorHasSelection",
+          "command": "opencode.generate",
+          "group": "opencode@1"
+        },
+        {
+          "when": "editorHasSelection",
+          "command": "opencode.securityScan",
+          "group": "opencode@2"
+        },
+        {
+          "command": "opencode.refactor",
+          "group": "opencode@3"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "OpenCode NVIDIA",
+      "properties": {
+        "opencode.apiEndpoint": {
+          "type": "string",
+          "default": "http://localhost:8080",
+          "description": "OpenCode API endpoint URL"
+        },
+        "opencode.enableStreaming": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable streaming code completions"
+        },
+        "opencode.maxTokens": {
+          "type": "number",
+          "default": 256,
+          "description": "Maximum tokens to generate"
+        },
+        "opencode.autoSecurityScan": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically scan code on save"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.84.0",
+    "@types/node": "^20.9.0",
+    "typescript": "^5.2.2",
+    "eslint": "^8.54.0",
+    "@typescript-eslint/parser": "^6.11.0",
+    "@typescript-eslint/eslint-plugin": "^6.11.0"
+  }
+}

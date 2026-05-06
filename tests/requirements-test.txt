@@ -1,0 +1,31 @@
+# Requirements for Testing OpenCode NVIDIA System
+
+# Core Testing Framework
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+hypothesis>=6.88.0  # Property-based testing
+
+# Load Testing
+locust>=2.17.0
+k6>=0.45.0
+
+# Mocking & Fixtures
+pytest-mock>=3.11.0
+factory-boy>=3.3.0
+
+# Code Quality Analysis
+bandit>=1.7.5
+semgrep>=1.40.0
+
+# Performance Profiling
+memory-profiler>=0.61.0
+py-spy>=0.3.14
+
+# Security Testing
+garak>=0.1.0  # LLM vulnerability scanner
+
+# Utilities
+requests>=2.31.0
+aiohttp>=3.8.5
+numpy>=1.24.0
