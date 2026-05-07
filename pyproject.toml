@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "opencode-nvidia"
 version = "0.1.0"
-description = "Transcendent OpenCode System with NVIDIA Models"
+description = "OpenCode System with NVIDIA Models"
 authors = ["Scott Mill <scottmill306@users.noreply.github.com>"]
 license = "MIT"
 readme = "README.md"
