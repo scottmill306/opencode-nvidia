@@ -1,6 +1,12 @@
 import * as vscode from 'vscode';
 import axios from 'axios';
-let apiEndpoint: string = 'http://localhost:8080';
+import DOMPurify from 'dompurify';
+
+// Configuration - enforce HTTPS in production
+let apiEndpoint: string = 'https://localhost:8080';
+
+// Token storage
+let authToken: string | null = null;
 
 // Shared state for inline completions — updated by completeCode()
 let pendingCompletion: vscode.InlineCompletionItem[] = [];
@@ -8,12 +14,64 @@ let pendingCompletion: vscode.InlineCompletionItem[] = [];
 // Shared diagnostic collection — created once in activate()
 let securityDiagnostics: vscode.DiagnosticCollection;
 
+/**
+ * Get authentication token, prompting user to login if needed
+ */
+async function getAuthToken(): Promise<string> {
+    if (authToken) {
+        return authToken;
+    }
+    
+    const config = vscode.workspace.getConfiguration('opencode');
+    const storedToken = config.get<string>('authToken');
+    
+    if (storedToken) {
+        authToken = storedToken;
+        return authToken;
+    }
+    
+    // Prompt user to login
+    const loginChoice = await vscode.window.showInformationMessage(
+        'Authentication required. Would you like to login?',
+        'Login',
+        'Cancel'
+    );
+    
+    if (loginChoice === 'Login') {
+        const username = await vscode.window.showInputBox({ prompt: 'Username' });
+        const password = await vscode.window.showInputBox({ prompt: 'Password', password: true });
+        
+        if (username && password) {
+            try {
+                const response = await axios.post(`${apiEndpoint}/auth/login`, null, {
+                    params: { username, password },
+                    timeout: 10000
+                });
+                
+                authToken = response.data.access_token;
+                await config.update('authToken', authToken, vscode.ConfigurationTarget.Global);
+                vscode.window.showInformationMessage('✅ Login successful');
+                return authToken;
+            } catch (error: any) {
+                vscode.window.showErrorMessage(`Login failed: ${error.message}`);
+            }
+        }
+    }
+    
+    throw new Error('Authentication required. Please login first.');
+}
+
 export function activate(context: vscode.ExtensionContext) {
     console.log('OpenCode NVIDIA extension is now active!');
 
     // Get API endpoint from configuration
     const config = vscode.workspace.getConfiguration('opencode');
-    apiEndpoint = config.get('apiEndpoint', 'http://localhost:8080');
+    apiEndpoint = config.get('apiEndpoint', 'https://localhost:8080');
+    
+    // Validate API endpoint uses HTTPS in production
+    if (!apiEndpoint.startsWith('http://localhost') && !apiEndpoint.startsWith('https://')) {
+        vscode.window.showWarningMessage('Security Warning: API endpoint should use HTTPS in production');
+    }
 
     // Register the inline completions provider once and add it to subscriptions
     context.subscriptions.push(
@@ -85,6 +143,11 @@ async function generateCode() {
             prompt: `${selectedText}\n\n# ${prompt}`,
             max_tokens: vscode.workspace.getConfiguration('opencode').get('maxTokens', 256),
             stream: vscode.workspace.getConfiguration('opencode').get('enableStreaming', true)
+        }, {
+            headers: {
+                'Authorization': `Bearer ${await getAuthToken()}`
+            },
+            timeout: 30000
         });
 
         const generatedCode = response.data.generated_code;
@@ -97,7 +160,11 @@ async function generateCode() {
 
         vscode.window.showInformationMessage(`✅ Code generated in ${response.data.latency_ms}ms`);
     } catch (error: any) {
-        vscode.window.showErrorMessage(`Failed to generate code: ${error.message}`);
+        if (error.response?.status === 401) {
+            vscode.window.showErrorMessage('Authentication failed. Please login first.');
+        } else {
+            vscode.window.showErrorMessage(`Failed to generate code: ${error.message}`);
+        }
     }
 }
 
@@ -115,6 +182,11 @@ async function completeCode() {
             prompt: linePrefix,
             max_tokens: 50,
             temperature: 0.3
+        }, {
+            headers: {
+                'Authorization': `Bearer ${await getAuthToken()}`
+            },
+            timeout: 10000
         });
 
         const completion = response.data.generated_code;
@@ -144,6 +216,11 @@ async function performSecurityScan(document: vscode.TextDocument) {
         const response = await axios.post(`${apiEndpoint}/security/scan`, {
             code: code,
             language: language
+        }, {
+            headers: {
+                'Authorization': `Bearer ${await getAuthToken()}`
+            },
+            timeout: 30000
         });
 
         const result = response.data;
@@ -177,7 +254,7 @@ async function performSecurityScan(document: vscode.TextDocument) {
             `⚠️ Found ${result.vulnerabilities.length} security issue(s). Risk level: ${result.risk_level.toUpperCase()}`
         );
 
-        // Show suggestions
+        // Show suggestions with XSS protection
         if (result.suggestions.length > 0) {
             const suggestion = await vscode.window.showInformationMessage(
                 'Security suggestions available',
@@ -189,14 +266,26 @@ async function performSecurityScan(document: vscode.TextDocument) {
                     'securitySuggestions',
                     'Security Suggestions',
                     vscode.ViewColumn.One,
-                    {}
+                    {
+                        enableScripts: false,
+                        contentSecurityPolicy: "default-src 'none'; style-src 'unsafe-inline';"
+                    }
                 );
+                
+                // Sanitize suggestions to prevent XSS
+                const sanitizedSuggestions = result.suggestions.map((s: string) => 
+                    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+                );
+                
                 panel.webview.html = `
                     <html>
+                        <head>
+                            <meta charset="UTF-8">
+                        </head>
                         <body>
                             <h2>Security Suggestions</h2>
                             <ul>
-                                ${result.suggestions.map((s: string) => `<li>${s}</li>`).join('')}
+                                ${sanitizedSuggestions.map((s: string) => `<li>${s}</li>`).join('')}
                             </ul>
                         </body>
                     </html>
@@ -204,7 +293,11 @@ async function performSecurityScan(document: vscode.TextDocument) {
             }
         }
     } catch (error: any) {
-        vscode.window.showErrorMessage(`Security scan failed: ${error.message}`);
+        if (error.response?.status === 401) {
+            vscode.window.showErrorMessage('Authentication failed. Please login first.');
+        } else {
+            vscode.window.showErrorMessage(`Security scan failed: ${error.message}`);
+        }
     }
 }
 
@@ -225,21 +318,33 @@ async function refactorCode() {
     try {
         const response = await axios.post(`${apiEndpoint}/refactor`, {
             prompt: selectedText
+        }, {
+            headers: {
+                'Authorization': `Bearer ${await getAuthToken()}`
+            },
+            timeout: 30000
         });
 
         const result = response.data;
         
-        // Show refactoring results
+        // Show refactoring results with XSS protection
         const panel = vscode.window.createWebviewPanel(
             'refactorResults',
             'GPU Refactoring Results',
             vscode.ViewColumn.Beside,
-            {}
+            {
+                enableScripts: false,
+                contentSecurityPolicy: "default-src 'none'; style-src 'unsafe-inline';"
+            }
         );
 
+        // Sanitize output to prevent XSS
+        const sanitizeHtml = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        
         panel.webview.html = `
             <html>
                 <head>
+                    <meta charset="UTF-8">
                     <style>
                         body { font-family: var(--vscode-font-family); padding: 20px; }
                         .improvement { background: var(--vscode-editor-background); padding: 10px; margin: 10px 0; border-radius: 5px; }
@@ -249,20 +354,24 @@ async function refactorCode() {
                 </head>
                 <body>
                     <h2>🚀 GPU Optimization Results</h2>
-                    <p class="performance">Performance Gain: ${result.performance_gain}</p>
+                    <p class="performance">Performance Gain: ${sanitizeHtml(result.performance_gain)}</p>
                     
                     <h3>Improvements:</h3>
-                    ${result.improvements.map((imp: string) => `<div class="improvement">✓ ${imp}</div>`).join('')}
+                    ${result.improvements.map((imp: string) => `<div class="improvement">✓ ${sanitizeHtml(imp)}</div>`).join('')}
                     
                     <h3>Refactored Code:</h3>
-                    <pre><code>${result.refactored_code}</code></pre>
+                    <pre><code>${sanitizeHtml(result.refactored_code)}</code></pre>
                 </body>
             </html>
         `;
 
         vscode.window.showInformationMessage('✅ Refactoring complete! View results in the side panel.');
     } catch (error: any) {
-        vscode.window.showErrorMessage(`Refactoring failed: ${error.message}`);
+        if (error.response?.status === 401) {
+            vscode.window.showErrorMessage('Authentication failed. Please login first.');
+        } else {
+            vscode.window.showErrorMessage(`Refactoring failed: ${error.message}`);
+        }
     }
 }
 
