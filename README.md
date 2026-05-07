@@ -1,6 +1,6 @@
-# Transcendent OpenCode System with NVIDIA Models
+# OpenCode System with NVIDIA Models
 
-Building **"transcendent" systems** means creating AI‑powered platforms that go **beyond basic code assistance** — delivering **real‑time, context‑aware, highly optimized, secure, and scalable** code intelligence. By leveraging **NVIDIA's GPU‑accelerated AI stack**, you can unlock unprecedented performance for open‑source code tasks (generation, optimization, analysis, security, etc.).
+Building AI‑powered platforms that go **beyond basic code assistance** — delivering **real‑time, context‑aware, highly optimized, secure, and scalable** code intelligence. By leveraging **NVIDIA's GPU‑accelerated AI stack**, you can unlock unprecedented performance for open‑source code tasks (generation, optimization, analysis, security, etc.).
 
 ## 📁 Project Structure
 

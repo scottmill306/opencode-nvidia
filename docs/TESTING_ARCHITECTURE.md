@@ -1,7 +1,7 @@
-# Testing Architecture for Transcendent OpenCode Systems
+# Testing Architecture for OpenCode Systems
 
 ## 1. Overview
-This architecture ensures the system meets the "Transcendent" criteria: **<100ms latency**, **Repo-wide context**, **Self-securing**, and **Scalability**.
+This architecture ensures the system meets the core criteria: **<100ms latency**, **Repo-wide context**, **Self-securing**, and **Scalability**.
 
 ### Testing Pyramid
 ```mermaid
